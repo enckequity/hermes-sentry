@@ -121,7 +121,7 @@ Nothing is patched, wrapped or rebound. Every decision is a return value on a do
 | Source | Default |
 | --- | --- |
 | `web_search`, `web_extract`, `web_fetch`, `browser_exec` | untrusted |
-| any `mcp__*` tool | untrusted (third-party server) |
+| any `mcp_*` tool (`mcp__server__tool`, `mcp_apps_*`, `mcp_composio_*`) | untrusted (third-party server) |
 | `computer_use`, `read_window_below`, `drive_preview`, `vision_analyze` | untrusted (screens and images carry text too) |
 | `terminal` whose command reaches the network (`curl`, `wget`, `ssh`, `nc`, …) | untrusted |
 | a file written during a tainted turn, read back later | untrusted (propagation) |
@@ -180,7 +180,8 @@ is logged and the built-in defaults stay in force.
   carrying third-party content.
 - **`egress_send`** (`tainted`) — a data-sending call to a host nobody allowlisted, from a tainted
   session. Reads are never gated by this rule, so ordinary browsing keeps working.
-- **`write_outside`** (`tainted`) — writing outside the workspace from a tainted session.
+- **`write_outside`** (`tainted`) — writing outside the workspace from a tainted session. Inert unless the
+  policy sets `workspace:`; the gateway process cwd is not treated as a workspace.
 - **`delegate`** (`tainted`) — a subagent spawned from a tainted session. Observed, not blocked.
 - **`instruction_write`** (`tainted`) — writing a file the agent reads as *instructions* in a later
   session: `AGENTS.md`, `CLAUDE.md`, `.hermes.md`, `SKILL.md`, a hook handler, Hermes' own
@@ -310,7 +311,7 @@ no outbound requests.
 ## Development
 
 ```bash
-python tests/test_taint_sentry.py                 # 89 tests, no runner needed
+python tests/test_taint_sentry.py                 # 94 tests, no runner needed
 hermes plugins doctor . --ci                     # real runtime contracts
 hermes plugins validate . --install-deps         # the catalog CI gate
 ```

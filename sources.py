@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
 
-# Tools whose result is authored by a third party. Exact names, plus the mcp__ prefix below.
+# Tools whose result is authored by a third party. Exact names, plus the mcp_ prefix below.
 UNTRUSTED_TOOLS = frozenset(
     {
         "web_search",
@@ -27,8 +27,11 @@ UNTRUSTED_TOOLS = frozenset(
     }
 )
 
-# Any tool from an MCP server is third-party code with third-party content.
-UNTRUSTED_PREFIXES = ("mcp__",)
+# Any tool from an MCP server is third-party code with third-party content. The engine registers
+# them as ``mcp__<server>__<tool>`` today, and connected-app bridges (Composio ``mcp_apps_*``,
+# ``mcp_composio_*``) and older engines use a single underscore, so the prefix is ``mcp_`` — the same
+# one the engine's own untrusted-result wrapper uses.
+UNTRUSTED_PREFIXES = ("mcp_",)
 
 # Tools whose trust depends on *what* they touch: a path in the workspace is yours, a path in
 # ~/.ssh is not, and a file written earlier from untrusted content stays untrusted.
@@ -184,7 +187,23 @@ _BARE_HOST_RE = re.compile(
 # Local-only destinations: never an exfil channel worth gating.
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal"})
 
-_MCP_TOOL_RE = re.compile(r"^mcp__([a-z0-9_.-]+?)__")
+# ``mcp__<server>__<tool>`` (server may contain single underscores) or ``mcp_<server>_<tool>``.
+# Case-insensitive: the engine keeps the server's and tool's own case (``mcp__Composio__GMAIL_X``).
+_MCP_TOOL_RE = re.compile(r"(?i)^mcp_(?:_(?P<double>[a-z0-9_.-]+?)__|(?P<single>[a-z0-9.-]+)_)")
+
+
+def mcp_server_of(tool_name: str) -> str:
+    """The MCP server a tool belongs to, or ``""`` when the name is not an MCP tool.
+
+    Any ``mcp_``-prefixed name counts; when no server part can be read the server is ``"mcp"``.
+    """
+    tool = (tool_name or "").strip()
+    if not tool.lower().startswith("mcp_"):
+        return ""
+    match = _MCP_TOOL_RE.match(tool)
+    if not match:
+        return "mcp"
+    return match.group("double") or match.group("single") or "mcp"
 
 # Shell command separators. `a; b` and `a | b` are two steps, and only a single step that both
 # names a sensitive path and reaches the network is the exfil composite.
@@ -275,9 +294,9 @@ def classify(tool_name: str, args: dict, *, workspace: str = "", tainted_artifac
     """
     tool = (tool_name or "").strip()
 
-    mcp = _MCP_TOOL_RE.match(tool)
-    if mcp:
-        return Source("untrusted", f"{tool} (mcp:{mcp.group(1)})", tool, reason="third-party MCP server")
+    server = mcp_server_of(tool)
+    if server:
+        return Source("untrusted", f"{tool} (mcp:{server})", tool, reason="third-party MCP server")
 
     if tool in UNTRUSTED_TOOLS:
         host = ""
@@ -716,4 +735,5 @@ __all__ = [
     "SENSITIVE_PATH_RE",
     "UNTRUSTED_TOOLS",
     "UNTRUSTED_PREFIXES",
+    "mcp_server_of",
 ]

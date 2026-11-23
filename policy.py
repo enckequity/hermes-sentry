@@ -449,7 +449,9 @@ def evaluate(
     matches: list[Decision] = []
 
     egress = sources.egress_of(tool, args)
-    touched = sources.paths_of(tool, args, workspace=workspace or sources.workspace_of(args))
+    # No configured workspace means no outside-the-workspace check: a call's own `workdir` is not a
+    # boundary anyone chose, so it is not used as one.
+    touched = sources.paths_of(tool, args, workspace=workspace)
     external = egress.external_hosts(allow_hosts) if egress.hosts else ()
 
     # 1. Changing this plugin's own controls. Always evaluated, tainted or not. A *read* of the

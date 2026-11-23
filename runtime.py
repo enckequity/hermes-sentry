@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 from pathlib import Path
@@ -170,19 +169,15 @@ def mode() -> str:
 
 
 def workspace() -> str:
-    """Best available notion of the workspace root for path decisions.
+    """The workspace root for path decisions, or ``""`` when none is configured.
 
-    Hooks are not handed a cwd, so the agent's own process cwd is the honest answer; a policy can
-    override it with ``workspace:``.
+    Only an explicit policy ``workspace:`` counts. Hooks are not handed a cwd, and the process cwd of
+    a gateway is wherever the service was started, not the person's workspace — using it made every
+    ordinary write look like a write outside the workspace. With no workspace configured the
+    ``write_outside`` rule is inert; credential, instruction-file and egress rules are unaffected.
     """
     try:
-        override = str(effective_policy().get("workspace") or "").strip()
-        if override:
-            return override
-    except Exception:
-        pass
-    try:
-        return os.getcwd()
+        return str(effective_policy().get("workspace") or "").strip()
     except Exception:
         return ""
 
